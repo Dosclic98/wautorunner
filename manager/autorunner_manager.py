@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import traceback
 
 class AutorunnerManager():
-    DEBUG_ANALYZER: bool = False
+    DEBUG_ANALYZER: bool = True
 
     def __init__(self, **kwargs):
         self.logger = getLogger("AutorunnerManager")
@@ -73,10 +73,6 @@ class AutorunnerManager():
                 # Let it run for maximum period_s seconds
                 ppNet = controller._physical_simulator._grid_model._pp_net
                 nxGraph: nx.Graph = tp.create_nxgraph(controller._physical_simulator._grid_model._pp_net, respect_switches=True)
-                self.logger.info("Edges impedances")
-                print(nxGraph.edges.data())
-                self.logger.info("Unsupplied busses")
-                print(tp.unsupplied_buses(ppNet))
                 nx.draw(nxGraph, with_labels=True)
                 plt.savefig(self.scenario.scenarioPath.joinpath("fullPPGraph.png"))
                 simple_plot(ppNet, plot_gens=True, plot_line_switches=True, plot_loads=True, plot_sgens=True)
