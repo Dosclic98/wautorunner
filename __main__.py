@@ -1,13 +1,20 @@
 
+import logging.handlers
+
+
 def main():
     """
     Main function to run the AutorunnerManager.
     """
     from wautorunner.manager.autorunner_manager import AutorunnerManager
-    from logging import basicConfig, INFO, DEBUG
+    import logging
+    from logging import StreamHandler, basicConfig, INFO, DEBUG
+    from wautorunner.utils.log_formatter import ColoredFormatter
 
     # Configure logging
-    basicConfig(level=INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    loggerHandler = StreamHandler()
+    loggerHandler.setFormatter(ColoredFormatter())
+    basicConfig(level=DEBUG, handlers=[loggerHandler])
     # Create an instance of AutorunnerManager
     manager = AutorunnerManager()
     # Execute the scenario
