@@ -3,6 +3,7 @@ from wautorunner.analyzer.experiment_analyzer import ExperimentAnalyzer
 from wautorunner.scenario.modifiers.modifier_interface import ModifierInterface
 from wautorunner.scenario.modifiers.modifier_concrete import MultiplyLoadsModifier, MultiplyGenerationModifier, SetAllSwitchesModifier
 from wautorunner.scenario.modifiers.modifier_concrete import SetSwitchesModifier, AttackerStrategyModifier, StrategyType, StrategyBuilder
+from wautorunner.scenario.modifiers.modifier_concrete import MultiplyMaxCurrentModifier, SetMinMaxVoltageModifier
 from wautorunner.scenario.modifiers.modifier_concrete import ExecTimeModifier
 from wattson.cosimulation.control.co_simulation_controller import CoSimulationController
 from wattson.cosimulation.simulators.network.emulators.wattson_network_emulator import WattsonNetworkEmulator
@@ -17,7 +18,7 @@ import matplotlib.pyplot as plt
 import traceback
 
 class AutorunnerManager():
-    DEBUG_ANALYZER: bool = True
+    DEBUG_ANALYZER: bool = False
 
     def __init__(self, **kwargs):
         self.logger = getLogger("AutorunnerManager")
@@ -30,6 +31,8 @@ class AutorunnerManager():
                                                         [ExecTimeModifier(self.scenario, 40.0),
                                                          MultiplyLoadsModifier(self.scenario, 2.0), 
                                                          MultiplyGenerationModifier(self.scenario, 0.5),
+                                                         MultiplyMaxCurrentModifier(self.scenario, 0.5),
+                                                         SetMinMaxVoltageModifier(self.scenario, minVoltage=0.95, maxVoltage=1.05),
                                                          SetSwitchesModifier(self.scenario, 
                                                                              status={
                                                                                  2: False,

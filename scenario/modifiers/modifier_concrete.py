@@ -44,7 +44,52 @@ class MultiplyGenerationModifier(ModifierInterface):
             origGenScale: float = generatorData["attributes"]["CONFIGURATION"]["scaling"]
             generatorData["attributes"]["CONFIGURATION"]["scaling"] = origGenScale * self.factor
 
-        self.scenario.savePowerGridModel(powerGridModel)    
+        self.scenario.savePowerGridModel(powerGridModel)   
+
+class MultiplyMaxCurrentModifier(ModifierInterface):
+    """
+    Multiply all max currents (for each line) by a given factor.
+    """
+
+    def __init__(self, scenario: Scenario, factor: float) -> None:
+        super().__init__(scenario)
+        self.factor = factor
+
+    def modify(self) -> None:
+        """
+        Multiply all max current scales by the given factor.
+        """
+        powerGridModel: dict = self.scenario.getPowerGridModel()
+        lines: dict = powerGridModel.get("elements", {}).get("line", {})
+        # Modify max current scales appropriately
+        for _, lineData in lines.items():
+            origMaxCurrent: float = lineData["attributes"]["PROPERTY"]["maximum_current"]
+            lineData["attributes"]["PROPERTY"]["maximum_current"] = origMaxCurrent * self.factor
+
+        self.scenario.savePowerGridModel(powerGridModel) 
+
+class SetMinMaxVoltageModifier(ModifierInterface):
+    """
+    Set the minimum and maximum voltage for all buses in the power grid model.
+    """
+
+    def __init__(self, scenario: Scenario, minVoltage: float, maxVoltage: float) -> None:
+        super().__init__(scenario)
+        self.minVoltage = minVoltage
+        self.maxVoltage = maxVoltage
+
+    def modify(self) -> None:
+        """
+        Set the minimum and maximum voltage for all buses in the power grid model.
+        """
+        powerGridModel: dict = self.scenario.getPowerGridModel()
+        buses: dict = powerGridModel.get("elements", {}).get("bus", {})
+        # Modify bus voltages appropriately
+        for _, busData in buses.items():
+            busData["attributes"]["PROPERTY"]["minimum_voltage"] = self.minVoltage
+            busData["attributes"]["PROPERTY"]["maximum_voltage"] = self.maxVoltage
+
+        self.scenario.savePowerGridModel(powerGridModel)
 
 class SetAllSwitchesModifier(ModifierInterface):
     """
