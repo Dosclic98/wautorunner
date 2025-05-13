@@ -6,6 +6,7 @@ import json, os, glob, datetime, logging
 import pandapower as pp
 import pandapower.topology as top
 import networkx as nx
+from networkx.algorithms.cycles import simple_cycles
 
 
 class ExperimentAnalyzer:
@@ -41,6 +42,7 @@ class ExperimentAnalyzer:
 
         percAbnormalBusses = []
         percOverloadedLines = []
+        percNodesInCycles = []
 
         for i in range(len(timeBins) - 1):
             binStart = timeBins[i]
@@ -89,6 +91,7 @@ class ExperimentAnalyzer:
                 self.logger.debug(f"No configurations in time bin {i}.")
 
             if len(ppNetworksInTimeBin):
+                # Find unsupplied busses
                 unsuppliedBusses = set()
                 for network in ppNetworksInTimeBin:
                     unsuppliedBusses.update(top.unsupplied_buses(network["pp_network"]))
@@ -96,12 +99,21 @@ class ExperimentAnalyzer:
                     self.logger.debug(f"Network impedances: {nxGraph.edges.data()}:")
                 self.logger.debug(f"Unsupplied busses: {unsuppliedBusses}")
 
+                # Find cycles
+                cycles = list(simple_cycles(nxGraph))
+                self.logger.debug(f"Basic cycles: {cycles}")
+                uniqueNodesInCycles = set([n for c in cycles for n in c])
+                percInCycles = len(uniqueNodesInCycles) / len(nxGraph.nodes) if len(nxGraph.nodes) > 0 else 0
+                self.logger.debug(f"Percentage of nodes in cycles: {percInCycles}")
+                percNodesInCycles.append(percInCycles)
+
             self.logger.debug(" ----------------------------------------")
 
 
         return {
             "percAbnormalBusses": percAbnormalBusses,
-            "percOverloadedLines": percOverloadedLines
+            "percOverloadedLines": percOverloadedLines,
+            "percNodesInCycles": percNodesInCycles
         }
 
     def _loadResults(self):

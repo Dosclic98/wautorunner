@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import traceback
 
 class AutorunnerManager():
-    DEBUG_ANALYZER: bool = False
+    DEBUG_ANALYZER: bool = True
 
     def __init__(self, **kwargs):
         self.logger = getLogger("AutorunnerManager")
