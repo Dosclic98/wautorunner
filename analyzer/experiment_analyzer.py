@@ -43,6 +43,8 @@ class ExperimentAnalyzer:
         percAbnormalBusses = []
         percOverloadedLines = []
         percNodesInCycles = []
+        switchStates = []
+
 
         for i in range(len(timeBins) - 1):
             binStart = timeBins[i]
@@ -83,10 +85,11 @@ class ExperimentAnalyzer:
                 switchConfigsInTimeBin = configurationsInTimeBin[configurationsInTimeBin["element-type"] == "switch"]
                 switchConfigsInTimeBin = switchConfigsInTimeBin.groupby(["element-id", "config-name"]).agg({"state": "mean"})
                 switchConfigsInTimeBin["state"] = switchConfigsInTimeBin["state"].apply(lambda x: True if x > 0.5 else False)
-                switchStates: dict = {}
+                switchStatesDict: dict = {}
                 for index, row in switchConfigsInTimeBin.iterrows():
-                    switchStates[index] = row["state"]
-                self.logger.debug(f"Switch configurations: {switchStates}")
+                    switchStatesDict[index[0]] = row["state"]
+                self.logger.debug(f"Switch configurations: {switchStatesDict}")
+                switchStates.append(switchStatesDict)
             else:
                 self.logger.debug(f"No configurations in time bin {i}.")
 
@@ -113,8 +116,87 @@ class ExperimentAnalyzer:
         return {
             "percAbnormalBusses": percAbnormalBusses,
             "percOverloadedLines": percOverloadedLines,
-            "percNodesInCycles": percNodesInCycles
+            "percNodesInCycles": percNodesInCycles,
+            "switchStates": switchStates
         }
+    
+    def discretizeTraces(self, dt: int, loadProfile: bool, genProfile: bool) -> dict:
+        contTraces = self.genTraces(dt)
+        self.logger.debug(f"Len abnormal busses: {len(contTraces['percAbnormalBusses'])}")
+        self.logger.debug(f"Len overloaded lines: {len(contTraces['percOverloadedLines'])}")
+        self.logger.debug(f"Len nodes in cycles: {len(contTraces['percNodesInCycles'])}")
+        self.logger.debug(f"Len switch states: {len(contTraces['switchStates'])}")
+
+        discreteDict = {}
+        for i in range(len(contTraces["percAbnormalBusses"])):
+            value = ""
+            if contTraces["percAbnormalBusses"][i] < 0.25:
+                value = "BV_0"
+            elif contTraces["percAbnormalBusses"][i] < 0.5:
+                value = "BV_1"
+            elif contTraces["percAbnormalBusses"][i] < 0.75:
+                value = "BV_2"
+            else:
+                value = "BV_3"
+
+
+            if i == 0:
+                discreteDict["Bus_Voltages"] = [value]
+            else:
+                discreteDict[f"Bus_Voltages_{i}"] = [value]
+
+        for i in range(len(contTraces["percOverloadedLines"])):
+            value = ""
+            if contTraces["percOverloadedLines"][i] < 0.25:
+                value = "LL_0"
+            elif contTraces["percOverloadedLines"][i] < 0.5:
+                value = "LL_1"
+            elif contTraces["percOverloadedLines"][i] < 0.75:
+                value = "LL_2"
+            else:
+                value = "LL_3"
+
+            if i == 0:
+                discreteDict["Line_Loads"] = [value]
+            else:
+                discreteDict[f"Line_Loads_{i}"] = [value]
+        
+        for i in range(len(contTraces["percNodesInCycles"])):
+            value = ""
+            if contTraces["percNodesInCycles"][i] < 0.25:
+                value = "C_0"
+            elif contTraces["percNodesInCycles"][i] < 0.5:
+                value = "C_1"
+            elif contTraces["percNodesInCycles"][i] < 0.75:
+                value = "C_2"
+            else:
+                value = "C_3"
+
+            if i == 0:
+                discreteDict["Node_Cycles"] = [value]
+            else:
+                discreteDict[f"Node_Cycles_{i}"] = [value]
+        
+        for i in range(len(contTraces["switchStates"])):
+            for index, state in contTraces["switchStates"][i].items():
+                if i == 0:
+                    discreteDict[f"Switch_{index}"] = ["C"] if state else ["O"]
+                else:
+                    discreteDict[f"Switch_{index}_{i}"] = ["C"] if state else ["O"]
+        
+        # Add load and generation profiles traces
+        if not loadProfile:
+            discreteDict["Load"] = "L_0"
+        else:
+            discreteDict["Load"] = "L_1"
+
+        if not genProfile:
+            discreteDict["Generation"] = ["G_0"]
+        else:
+            discreteDict["Generation"] = ["G_1"]
+        
+        return pd.DataFrame.from_dict(discreteDict)
+
 
     def _loadResults(self):
         matchingDirs = [dir for dir in os.listdir(self.working_dir) if fnmatch(dir, f"{self.scenario.getName()}*")]

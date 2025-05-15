@@ -16,6 +16,7 @@ from pprint import pprint
 import networkx as nx
 import matplotlib.pyplot as plt
 import traceback
+import pandas as pd
 
 class AutorunnerManager():
     DEBUG_ANALYZER: bool = True
@@ -89,8 +90,8 @@ class AutorunnerManager():
 
         # TODO Perform log analysis
         analyzer: ExperimentAnalyzer = ExperimentAnalyzer(Path("wattson-artifacts"), self.scenario)
-        traces: dict = analyzer.genTraces(2)
-        print(traces)
+        traces: pd.DataFrame = analyzer.discretizeTraces(dt=2, loadProfile=True, genProfile=True)
+        traces.to_csv(self.scenario.scenarioPath.joinpath("traces.csv"))
         self.logger.info("Finished execution")
 
     @staticmethod
