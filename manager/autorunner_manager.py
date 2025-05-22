@@ -15,24 +15,22 @@ import time, sys, traceback, signal
 from pprint import pprint
 import networkx as nx
 import matplotlib.pyplot as plt
-import traceback
+import traceback, random, shutil
 import pandas as pd
 
 class AutorunnerManager():
-    DEBUG_ANALYZER: bool = True
+    DEBUG_ANALYZER: bool = False
 
     def __init__(self, **kwargs):
         self.logger = getLogger("AutorunnerManager")
         self.logger.info("Building scenario")
-        self.scenario: Scenario = kwargs.get("scenario", ScenarioBuilder.build(
-            originPath=Path("wautorunner/scenarios/powerowl_example_template"),
-            targetPath=Path("wautorunner/scenarios/powerowl_example_final")
-        ))
+        self.scenario: Scenario = kwargs.get("scenario", self.rebuildBaseScenario())
+
         self.modifiers: list[ModifierInterface] = kwargs.get("modifiers", 
                                                         [ExecTimeModifier(self.scenario, 40.0),
                                                          MultiplyLoadsModifier(self.scenario, 2.0), 
                                                          MultiplyGenerationModifier(self.scenario, 0.5),
-                                                         MultiplyMaxCurrentModifier(self.scenario, 0.5),
+                                                         MultiplyMaxCurrentModifier(self.scenario, 1),
                                                          SetMinMaxVoltageModifier(self.scenario, minVoltage=0.95, maxVoltage=1.05),
                                                          SetSwitchesModifier(self.scenario, 
                                                                              status={
@@ -49,12 +47,103 @@ class AutorunnerManager():
                                                                                  ])
                                                         ])
 
-    def execute(self):
+    def rebuildBaseScenario(self) -> Scenario:
+        """
+        Rebuilds the base scenario from the template.
+        """
+        scenario: Scenario = ScenarioBuilder.build(
+            originPath=Path("wautorunner/scenarios/powerowl_example_template"),
+            targetPath=Path("wautorunner/scenarios/powerowl_example_final")
+        )
+        self.logger.info("Scenario rebuilt")
+        return scenario
+
+    def autoBatchExecute(self, runTime: float, numRuns: int):
+        """
+        Generates multiple scenarios with different modifiers and executes them.
+        """
+        traces: pd.DataFrame 
+        for i in range(0, numRuns):
+            self.scenario = self.rebuildBaseScenario()
+            modList: list[ModifierInterface] = self._generateNewModifiers(time=runTime)
+            newTraces: pd.DataFrame = self._execute(modList)
+            if i == 0: traces = newTraces
+            else:
+                # Append new traces
+                traces = pd.concat([traces, newTraces], ignore_index=True)
+            traces.to_csv(self.scenario.scenarioPath.joinpath("traces.csv"), index=False)
+            self.logger.info(f"Finished execution {i+1}/{numRuns}")
+            self.logger.info(f"Sleeping for 1 second between runs")
+            time.sleep(1)  # Sleep for 1 second between runs
+    
+    def _generateNewModifiers(self, time: float) -> list[list[ModifierInterface]]:
+        """
+        Generates multiple lists of modifiers
+        """
+        newModifiers: list[ModifierInterface] = []
+        # Generates an ExecTimeModifier based on the input parameter
+        newModifiers.append(ExecTimeModifier(self.scenario, time))
+        newModifiers.append(SetMinMaxVoltageModifier(self.scenario, minVoltage=0.95, maxVoltage=1.05))
+        # Randomly initialize load and generation modifiers
+        loadMultiplier = round(random.uniform(0.5, 2.5), 2)
+        generationMultiplier = round(random.uniform(0.5, 2.5), 2)
+        newModifiers.append(MultiplyLoadsModifier(self.scenario, loadMultiplier))
+        newModifiers.append(MultiplyGenerationModifier(self.scenario, generationMultiplier)) 
+
+        # Set a lower limit for the max current
+        newModifiers.append(MultiplyMaxCurrentModifier(self.scenario, 0.5))
+
+        # Generate a switch configuration where 1, 2, 4 are open and the others are closed
+        switchConfig = {}
+        for i in range(0, 8):
+            if i == 1 or i == 2 or i == 4:
+                switchConfig[i] = False
+            else:
+                switchConfig[i] = True
+        newModifiers.append(SetSwitchesModifier(self.scenario, status=switchConfig))
+
+        # Randomly generate an attack strategy type
+        strategyType = random.choice([StrategyType.EXPLICIT, StrategyType.INTERMITTENT])
+        startDelay = 0
+        closeDelay = 0
+        # Randomly generate a number of switches to be attacked
+        numAtkSwitches = random.randint(1, 6)
+        if strategyType == StrategyType.EXPLICIT:
+            # Randomly generate a list of numAtkSwitches switches to be attacked with their respective times
+            # and new status negating the previous status
+            strategy: list[dict] = []
+            swIds = []
+            for i in range(0, numAtkSwitches):
+                switchId = random.randint(0, 5)
+                while switchId in swIds:
+                    switchId = random.randint(0, 5)
+                swIds.append(switchId) 
+                atkTime = round(random.uniform(5.0, time-5.0), 2)
+                isClosed = not switchConfig[switchId]
+                strategy.append(StrategyBuilder.build(switchId=switchId, time=atkTime, isClosed=isClosed)) 
+            startDelay = 0
+        elif strategyType == StrategyType.INTERMITTENT:
+            # Randomly generate a list of numAtkSwitches switches to be attacked
+            strategy: list[int] = []
+            swIds = []
+            for i in range(0, numAtkSwitches):
+                switchId = random.randint(0, 5)
+                while switchId in swIds:
+                    switchId = random.randint(0, 5)
+                swIds.append(switchId) 
+                strategy.append(switchId)
+            startDelay = round(random.uniform(5.0, time-5.0), 2)
+            closeDelay = round(random.uniform(2.0, 5.0), 2)
+        
+        newModifiers.append(AttackerStrategyModifier(self.scenario, strategyType=strategyType, strategy=strategy, closeDelay=closeDelay, startDelay=startDelay))
+        return newModifiers
+    
+    def _execute(self, modifiers: list[ModifierInterface]) -> pd.DataFrame:
         """
         Execute the scenario with the given modifiers.
         """
         self.logger.info("Applying modifiers")
-        for modifier in self.modifiers:
+        for modifier in modifiers:
             modifier.modify()
         
         if not AutorunnerManager.DEBUG_ANALYZER:
@@ -88,11 +177,12 @@ class AutorunnerManager():
             finally:
                 AutorunnerManager.stopController(controller)
 
-        # TODO Perform log analysis
         analyzer: ExperimentAnalyzer = ExperimentAnalyzer(Path("wattson-artifacts"), self.scenario)
-        traces: pd.DataFrame = analyzer.discretizeTraces(dt=2, loadProfile=True, genProfile=True)
-        traces.to_csv(self.scenario.scenarioPath.joinpath("traces.csv"))
+        traces: pd.DataFrame = analyzer.discretizeTraces(dt=2, totT=self.scenario.getExecTime())
         self.logger.info("Finished execution")
+        self.logger.info("Cleaning artifacts")
+        shutil.rmtree(controller.working_directory)
+        return traces
 
     @staticmethod
     def stopController(controller: CoSimulationController):

@@ -25,6 +25,8 @@ class Scenario:
         self.scenarioPath: Path = scenarioPath
         self.powerGridFilePath: Path = self.scenarioPath.joinpath("power-grid.yml")
         self.powerGridModel: dict = self.getPowerGridModel()
+        self.generationFactor: float = 1.0
+        self.loadFactor: float = 1.0
         self._name = self.scenarioPath.name
         self._execTime = None
 

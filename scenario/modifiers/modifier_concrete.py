@@ -15,6 +15,7 @@ class MultiplyLoadsModifier(ModifierInterface):
         """
         Multiply all loads by the given factor.
         """
+        self.scenario.loadFactor = self.factor
         powerGridModel: dict = self.scenario.getPowerGridModel()
         loads: dict = powerGridModel.get("elements", {}).get("load", {})
         # Modify load scales appropriately
@@ -37,6 +38,7 @@ class MultiplyGenerationModifier(ModifierInterface):
         """
         Multiply all generation scales by the given factor.
         """
+        self.scenario.generationFactor = self.factor
         powerGridModel: dict = self.scenario.getPowerGridModel()
         generators: dict = powerGridModel.get("elements", {}).get("sgen", {})
         # Modify generation scales appropriately
@@ -160,16 +162,18 @@ class StrategyBuilder:
 
 class AttackerStrategyModifier(ModifierInterface):
 
-    def __init__(self, scenario: Scenario, strategyType: StrategyType, strategy: list[dict] | list[int]) -> None:
+    def __init__(self, scenario: Scenario, strategyType: StrategyType, strategy: list[dict] | list[int], startDelay: int = 5, closeDelay: int = 4) -> None:
         super().__init__(scenario)
 
         if strategyType == StrategyType.EXPLICIT and not isinstance(strategy, list):
             raise ValueError("Strategy must be a list of dictionaries")
         if strategyType == StrategyType.INTERMITTENT and not isinstance(strategy, list):
-            raise ValueError("Strategy must be a list of strings")
+            raise ValueError("Strategy must be a list of integers")
         
         self.strategyType = strategyType
         self.strategy = strategy
+        self.startDelay = startDelay
+        self.closeDelay = closeDelay
 
     def modify(self) -> None:
         """
@@ -194,8 +198,8 @@ class AttackerStrategyModifier(ModifierInterface):
         else:
             raise ValueError("Attacker strategy script not found in script controller config")
 
-        scriptConfig["close_delay"] = 4
-        scriptConfig["start_delay"] = 5
+        scriptConfig["close_delay"] = self.closeDelay
+        scriptConfig["start_delay"] = self.startDelay
         scriptConfig["strategy"] = self.strategy
         scriptConfig["strategy_type"] = self.strategyType.value
 

@@ -120,15 +120,21 @@ class ExperimentAnalyzer:
             "switchStates": switchStates
         }
     
-    def discretizeTraces(self, dt: int, loadProfile: bool, genProfile: bool) -> dict:
+    def discretizeTraces(self, dt: int, totT: float) -> dict:
         contTraces = self.genTraces(dt)
         self.logger.debug(f"Len abnormal busses: {len(contTraces['percAbnormalBusses'])}")
         self.logger.debug(f"Len overloaded lines: {len(contTraces['percOverloadedLines'])}")
         self.logger.debug(f"Len nodes in cycles: {len(contTraces['percNodesInCycles'])}")
         self.logger.debug(f"Len switch states: {len(contTraces['switchStates'])}")
 
+        numSteps: int = round(totT / dt)
+
+        if (len(contTraces["percAbnormalBusses"]) < numSteps or len(contTraces["percOverloadedLines"]) < numSteps or 
+                len(contTraces["percNodesInCycles"]) < numSteps or len(contTraces["switchStates"]) < numSteps):
+            raise ValueError("Not enough data points to discretize traces.")
+
         discreteDict = {}
-        for i in range(len(contTraces["percAbnormalBusses"])):
+        for i in range(numSteps):
             value = ""
             if contTraces["percAbnormalBusses"][i] < 0.25:
                 value = "BV_0"
@@ -145,7 +151,7 @@ class ExperimentAnalyzer:
             else:
                 discreteDict[f"Bus_Voltages_{i}"] = [value]
 
-        for i in range(len(contTraces["percOverloadedLines"])):
+        for i in range(numSteps):
             value = ""
             if contTraces["percOverloadedLines"][i] < 0.25:
                 value = "LL_0"
@@ -161,16 +167,16 @@ class ExperimentAnalyzer:
             else:
                 discreteDict[f"Line_Loads_{i}"] = [value]
         
-        for i in range(len(contTraces["percNodesInCycles"])):
+        for i in range(numSteps):
             value = ""
             if contTraces["percNodesInCycles"][i] < 0.25:
-                value = "C_0"
+                value = "NC_0"
             elif contTraces["percNodesInCycles"][i] < 0.5:
-                value = "C_1"
+                value = "NC_1"
             elif contTraces["percNodesInCycles"][i] < 0.75:
-                value = "C_2"
+                value = "NC_2"
             else:
-                value = "C_3"
+                value = "NC_3"
 
             if i == 0:
                 discreteDict["Node_Cycles"] = [value]
@@ -185,15 +191,23 @@ class ExperimentAnalyzer:
                     discreteDict[f"Switch_{index}_{i}"] = ["C"] if state else ["O"]
         
         # Add load and generation profiles traces
-        if not loadProfile:
+        if self.scenario.loadFactor < 1:
             discreteDict["Load"] = "L_0"
-        else:
+        elif self.scenario.loadFactor < 1.5:
             discreteDict["Load"] = "L_1"
-
-        if not genProfile:
-            discreteDict["Generation"] = ["G_0"]
+        elif self.scenario.loadFactor < 2:
+            discreteDict["Load"] = "L_2"
         else:
+            discreteDict["Load"] = "L_3"
+
+        if self.scenario.generationFactor < 1:
+            discreteDict["Generation"] = ["G_0"]
+        elif self.scenario.generationFactor < 1.5:
             discreteDict["Generation"] = ["G_1"]
+        elif self.scenario.generationFactor < 2:
+            discreteDict["Generation"] = ["G_2"]
+        else:
+            discreteDict["Generation"] = ["G_3"]
         
         return pd.DataFrame.from_dict(discreteDict)
 
