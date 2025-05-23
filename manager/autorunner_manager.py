@@ -76,7 +76,7 @@ class AutorunnerManager():
             self.logger.info(f"Sleeping for 1 second between runs")
             time.sleep(1)  # Sleep for 1 second between runs
     
-    def _generateNewModifiers(self, time: float) -> list[list[ModifierInterface]]:
+    def _generateNewModifiers(self, time: float) -> list[ModifierInterface]:
         """
         Generates multiple lists of modifiers
         """
@@ -107,7 +107,7 @@ class AutorunnerManager():
         startDelay = 0
         closeDelay = 0
         # Randomly generate a number of switches to be attacked
-        numAtkSwitches = random.randint(1, 6)
+        numAtkSwitches = random.randint(3, 6)
         if strategyType == StrategyType.EXPLICIT:
             # Randomly generate a list of numAtkSwitches switches to be attacked with their respective times
             # and new status negating the previous status
@@ -132,7 +132,7 @@ class AutorunnerManager():
                     switchId = random.randint(0, 5)
                 swIds.append(switchId) 
                 strategy.append(switchId)
-            startDelay = round(random.uniform(5.0, time-5.0), 2)
+            startDelay = round(random.uniform(5.0, time/2), 2)
             closeDelay = round(random.uniform(2.0, 5.0), 2)
         
         newModifiers.append(AttackerStrategyModifier(self.scenario, strategyType=strategyType, strategy=strategy, closeDelay=closeDelay, startDelay=startDelay))

@@ -183,7 +183,7 @@ class ExperimentAnalyzer:
             else:
                 discreteDict[f"Node_Cycles_{i}"] = [value]
         
-        for i in range(len(contTraces["switchStates"])):
+        for i in range(numSteps):
             for index, state in contTraces["switchStates"][i].items():
                 if i == 0:
                     discreteDict[f"Switch_{index}"] = ["C"] if state else ["O"]
