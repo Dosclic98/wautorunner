@@ -6,6 +6,7 @@ import json, os, glob, datetime, logging
 import pandapower as pp
 import pandapower.topology as top
 import networkx as nx
+import numpy as np
 from networkx.algorithms.cycles import simple_cycles
 
 
@@ -45,8 +46,9 @@ class ExperimentAnalyzer:
         percNodesInCycles = []
         switchStates = []
 
-
+        fullTraceDf: pd.DataFrame = pd.DataFrame()
         for i in range(len(timeBins) - 1):
+            fullTraceDict = {}
             binStart = timeBins[i]
             binEnd = timeBins[i + 1]
             self.logger.debug(f"Time bin {i} - {binStart} to {binEnd}")
@@ -63,7 +65,6 @@ class ExperimentAnalyzer:
                 numOverloadedLines = len(lineLoadingsInTimeBin[lineLoadingsInTimeBin["measure"] > 100])
                 numBusses = len(busVoltagesInTimeBin)
                 numLines = len(lineLoadingsInTimeBin)
-
                 percAbnormalBusses.append(numAbnormalBusses / numBusses if numBusses > 0 else 0)
                 percOverloadedLines.append(numOverloadedLines / numLines if numLines > 0 else 0)
 
@@ -71,8 +72,12 @@ class ExperimentAnalyzer:
                 lineLoadings: dict = {}
                 for index, row in busVoltagesInTimeBin.iterrows():
                     busVoltages[index] = row["measure"]
+                    # Insert a new element with key BusVoltage_i and value voltage_of_bus_i in the dictionary
+                    fullTraceDict[f"BusVoltage_{index[0]}"] = [row["measure"]]
                 for index, row in lineLoadingsInTimeBin.iterrows():
                     lineLoadings[index] = row["measure"]
+                    # Insert a new element with key LineLoading_i and value loading_of_line_i in the dictionary
+                    fullTraceDict[f"LineLoading_{index[0]}"] = [row["measure"]]
 
                 self.logger.debug(f"Bus voltages: {busVoltages}")
                 self.logger.debug(f"Line loadings: {lineLoadings}")
@@ -88,6 +93,8 @@ class ExperimentAnalyzer:
                 switchStatesDict: dict = {}
                 for index, row in switchConfigsInTimeBin.iterrows():
                     switchStatesDict[index[0]] = row["state"]
+                    # Insert a new element with key SwitchClosed_i and value state_of_switch_i in the dictionary
+                    fullTraceDict[f"SwitchClosed_{index[0]}"] = [row["state"]]
                 self.logger.debug(f"Switch configurations: {switchStatesDict}")
                 switchStates.append(switchStatesDict)
             else:
@@ -110,6 +117,34 @@ class ExperimentAnalyzer:
                 self.logger.debug(f"Percentage of nodes in cycles: {percInCycles}")
                 percNodesInCycles.append(percInCycles)
 
+                # Count to how many cycles each bus belongs to
+                busCycleCount = {n: 0 for n in nxGraph.nodes}
+                for c in cycles:
+                    for n in c:
+                        busCycleCount[n] += 1
+
+                # Add a BusCycles_i feature to the dictionary for each bus
+                for bus_id, count in busCycleCount.items():
+                    fullTraceDict[f"BusCycles_{bus_id}"] = [count]
+
+                # A series of derived features for cycles information
+                cycleLengths = [len(c) for c in cycles]
+                fullTraceDict["NumCycles"] = [len(cycles)]
+                fullTraceDict["PercNodesInCycles"] = [percInCycles]
+                fullTraceDict["MeanCycleLength"] = [np.mean(cycleLengths)] if cycleLengths else [0]
+                fullTraceDict["MaxCycleLength"] = [max(cycleLengths)] if cycleLengths else [0]
+                fullTraceDict["MinCycleLength"] = [min(cycleLengths)] if cycleLengths else [0]
+
+                # Add features for generation and load profiles
+                fullTraceDict["Load"] = [self.scenario.loadFactor]
+                fullTraceDict["Generation"] = [self.scenario.generationFactor]
+
+                # Add a sequence number feature
+                fullTraceDict["SeqNumber"] = [i]
+            if i == 0:
+                fullTraceDf = pd.DataFrame.from_dict(fullTraceDict, orient="columns")
+            else:
+                fullTraceDf = pd.concat([fullTraceDf, pd.DataFrame.from_dict(fullTraceDict, orient="columns")], ignore_index=True)
             self.logger.debug(" ----------------------------------------")
 
 
@@ -117,7 +152,8 @@ class ExperimentAnalyzer:
             "percAbnormalBusses": percAbnormalBusses,
             "percOverloadedLines": percOverloadedLines,
             "percNodesInCycles": percNodesInCycles,
-            "switchStates": switchStates
+            "switchStates": switchStates,
+            "fullTraceDf": fullTraceDf
         }
     
     def discretizeTraces(self, dt: int, totT: float) -> dict:
@@ -209,7 +245,7 @@ class ExperimentAnalyzer:
         else:
             discreteDict["Generation"] = ["G_3"]
         
-        return pd.DataFrame.from_dict(discreteDict)
+        return contTraces["fullTraceDf"], pd.DataFrame.from_dict(discreteDict)
 
 
     def _loadResults(self):

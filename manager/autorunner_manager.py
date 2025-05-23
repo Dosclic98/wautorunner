@@ -62,19 +62,31 @@ class AutorunnerManager():
         """
         Generates multiple scenarios with different modifiers and executes them.
         """
-        traces: pd.DataFrame 
+        fullTraces: pd.DataFrame
+        discrTraces: pd.DataFrame 
         for i in range(0, numRuns):
+            runStartTime = time.time()
             self.scenario = self.rebuildBaseScenario()
             modList: list[ModifierInterface] = self._generateNewModifiers(time=runTime)
-            newTraces: pd.DataFrame = self._execute(modList)
-            if i == 0: traces = newTraces
+            newFullTraces, newDiscrTraces = self._execute(modList)
+            if i == 0: discrTraces = newDiscrTraces
             else:
                 # Append new traces
-                traces = pd.concat([traces, newTraces], ignore_index=True)
-            traces.to_csv(self.scenario.scenarioPath.joinpath("traces.csv"), index=False)
+                discrTraces = pd.concat([discrTraces, newDiscrTraces], ignore_index=True)
+            discrTraces.to_csv(self.scenario.scenarioPath.joinpath("discrTraces.csv"), index=False)
+            # Add a featur to newFullTraces to track the run number for each row
+            newFullTraces["run"] = i
+            if i == 0: fullTraces = newFullTraces
+            else:
+                # Append new traces
+                fullTraces = pd.concat([fullTraces, newFullTraces], ignore_index=True)
+            fullTraces.to_csv(self.scenario.scenarioPath.joinpath("fullTraces.csv"), index=False)
+            runEndTime = time.time()
             self.logger.info(f"Finished execution {i+1}/{numRuns}")
-            self.logger.info(f"Sleeping for 1 second between runs")
-            time.sleep(1)  # Sleep for 1 second between runs
+            self.logger.info(f"Run took: {runEndTime-runStartTime} s")
+            if i < numRuns-1:
+                self.logger.info(f"Starting next run...")
+                time.sleep(1)  # Sleep for 1 second between runs
     
     def _generateNewModifiers(self, time: float) -> list[ModifierInterface]:
         """
@@ -178,11 +190,11 @@ class AutorunnerManager():
                 AutorunnerManager.stopController(controller)
 
         analyzer: ExperimentAnalyzer = ExperimentAnalyzer(Path("wattson-artifacts"), self.scenario)
-        traces: pd.DataFrame = analyzer.discretizeTraces(dt=2, totT=self.scenario.getExecTime())
+        fullTraces, discreteTraces = analyzer.discretizeTraces(dt=2, totT=self.scenario.getExecTime())
         self.logger.info("Finished execution")
         self.logger.info("Cleaning artifacts")
-        shutil.rmtree(controller.working_directory)
-        return traces
+        #shutil.rmtree(controller.working_directory)
+        return fullTraces, discreteTraces
 
     @staticmethod
     def stopController(controller: CoSimulationController):
