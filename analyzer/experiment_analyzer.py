@@ -30,12 +30,15 @@ class ExperimentAnalyzer:
         self.configurations: pd.DataFrame = pd.DataFrame(columns=["timestamp", "element-type", "element-id", "config-name", "state"])
         self._loadResults()
 
-    def genTraces(self, dt: int) -> dict:
+    def genTraces(self, dt: int, baseDelay: float) -> dict:
         if self.measures.empty:
             raise ValueError("No measures data available.")
         
         self.measures.sort_index(ascending=True, inplace=True)
         self.configurations.sort_index(ascending=True, inplace=True)
+
+        # Exclude all measures before the base delay
+        self.measures = self.measures[self.measures["timestamp"] >= (self.measures["timestamp"].min() + datetime.timedelta(seconds=baseDelay))]
 
         startTime = self.measures["timestamp"].min()
         endTime = self.measures["timestamp"].max()
@@ -156,8 +159,8 @@ class ExperimentAnalyzer:
             "fullTraceDf": fullTraceDf
         }
     
-    def discretizeTraces(self, dt: int, totT: float) -> dict:
-        contTraces = self.genTraces(dt)
+    def discretizeTraces(self, dt: int, baseDelay: float, totT: float) -> dict:
+        contTraces = self.genTraces(dt, baseDelay=baseDelay)
         self.logger.debug(f"Len abnormal busses: {len(contTraces['percAbnormalBusses'])}")
         self.logger.debug(f"Len overloaded lines: {len(contTraces['percOverloadedLines'])}")
         self.logger.debug(f"Len nodes in cycles: {len(contTraces['percNodesInCycles'])}")
@@ -245,7 +248,7 @@ class ExperimentAnalyzer:
         else:
             discreteDict["Generation"] = ["G_3"]
         
-        return contTraces["fullTraceDf"], pd.DataFrame.from_dict(discreteDict)
+        return contTraces["fullTraceDf"].head(numSteps), pd.DataFrame.from_dict(discreteDict)
 
 
     def _loadResults(self):
