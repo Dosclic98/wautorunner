@@ -99,8 +99,8 @@ class AutorunnerManager():
         newModifiers.append(ExecTimeModifier(self.scenario, time))
         newModifiers.append(SetMinMaxVoltageModifier(self.scenario, minVoltage=0.95, maxVoltage=1.05))
         # Randomly initialize load and generation modifiers
-        loadMultiplier = round(random.uniform(0.5, 2.5), 2)
-        generationMultiplier = round(random.uniform(0.5, 2.5), 2)
+        loadMultiplier = round(random.uniform(0.75, 1.25), 2)
+        generationMultiplier = round(random.uniform(0.75, 1.25), 2)
         newModifiers.append(MultiplyLoadsModifier(self.scenario, loadMultiplier))
         newModifiers.append(MultiplyGenerationModifier(self.scenario, generationMultiplier)) 
 

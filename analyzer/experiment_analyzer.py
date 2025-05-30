@@ -62,8 +62,10 @@ class ExperimentAnalyzer:
             if not measuresInTimeBin.empty:
                 busVoltagesInTimeBin = measuresInTimeBin[(measuresInTimeBin["element-type"] == "bus") & (measuresInTimeBin["measure-name"] == "voltage")].sort_values(by="element-id")
                 lineLoadingsInTimeBin = measuresInTimeBin[(measuresInTimeBin["element-type"] == "line") & (measuresInTimeBin["measure-name"] == "loading")]
-                busVoltagesInTimeBin = busVoltagesInTimeBin.groupby(["element-id", "measure-name"]).agg({"measure": "mean"})
-                lineLoadingsInTimeBin = lineLoadingsInTimeBin.groupby(["element-id", "measure-name"]).agg({"measure": "mean"})
+                # Just take the last measure for each bus and line in the time bin
+
+                busVoltagesInTimeBin = busVoltagesInTimeBin.groupby(["element-id", "measure-name"]).agg({"measure": "last"})
+                lineLoadingsInTimeBin = lineLoadingsInTimeBin.groupby(["element-id", "measure-name"]).agg({"measure": "last"})
                 numAbnormalBusses = len(busVoltagesInTimeBin[(busVoltagesInTimeBin["measure"] < 0.95) | (busVoltagesInTimeBin["measure"] > 1.05)])
                 numOverloadedLines = len(lineLoadingsInTimeBin[lineLoadingsInTimeBin["measure"] > 100])
                 numBusses = len(busVoltagesInTimeBin)
@@ -91,7 +93,7 @@ class ExperimentAnalyzer:
                 
             if not configurationsInTimeBin.empty:
                 switchConfigsInTimeBin = configurationsInTimeBin[configurationsInTimeBin["element-type"] == "switch"]
-                switchConfigsInTimeBin = switchConfigsInTimeBin.groupby(["element-id", "config-name"]).agg({"state": "mean"})
+                switchConfigsInTimeBin = switchConfigsInTimeBin.groupby(["element-id", "config-name"]).agg({"state": "last"})
                 switchConfigsInTimeBin["state"] = switchConfigsInTimeBin["state"].apply(lambda x: True if x > 0.5 else False)
                 switchStatesDict: dict = {}
                 for index, row in switchConfigsInTimeBin.iterrows():
