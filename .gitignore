@@ -24,9 +24,6 @@ sdist/
 var/
 wheels/
 
-# ignore data directories
-**/data/*
-
 # Prometheus
 **/node_exporter
 
