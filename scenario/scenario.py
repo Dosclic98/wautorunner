@@ -8,21 +8,33 @@ import matplotlib.pyplot as plt
 class ScenarioBuilder:
     
     @staticmethod
-    def build(originPath: Path, targetPath: Path):
+    def build(originPath: Path, targetPath: Path, resultsPath: Path, clearResults: bool):
         """ Logic to build the scenario """
         # Copy the scenario from originPath to targetPath
         if originPath.exists():
             shutil.copytree(originPath, targetPath, dirs_exist_ok=True)
         else:
             raise FileNotFoundError(f"Origin path {originPath} does not exist.")
+        pcapPath = resultsPath.joinpath("pcaps")
+        if clearResults and resultsPath.exists():
+            # Clear the results directory if it exists
+            shutil.rmtree(resultsPath)
+            resultsPath.mkdir(parents=True, exist_ok=True)
+            pcapPath.mkdir(parents=True, exist_ok=True)
+        elif not resultsPath.exists():
+            # Create the results directory if it does not exist
+            resultsPath.mkdir(parents=True, exist_ok=True)
+            pcapPath.mkdir(parents=True, exist_ok=True)
 
         # Create a Scenario object
-        return Scenario(targetPath)
+        return Scenario(targetPath, resultsPath, pcapPath)
 
 
 class Scenario:
-    def __init__(self, scenarioPath: Path):
+    def __init__(self, scenarioPath: Path, resultsPath: Path, pcapPath: Path):
         self.scenarioPath: Path = scenarioPath
+        self.resultsPath: Path = resultsPath
+        self.pacpPath: Path = pcapPath
         self.powerGridFilePath: Path = self.scenarioPath.joinpath("power-grid.yml")
         self.powerGridModel: dict = self.getPowerGridModel()
         self.generationFactor: float = 1.0
@@ -66,6 +78,12 @@ class Scenario:
 
     def getScenarioPath(self) -> Path:
         return self.scenarioPath
+    
+    def getResultsPath(self) -> Path:
+        return self.resultsPath
+    
+    def getPcapPath(self) -> Path:
+        return self.pacpPath
     
     def _buildSwitchesGraph(self) -> nx.DiGraph:
         # Build a networkx graph based on circuir breakers and switches

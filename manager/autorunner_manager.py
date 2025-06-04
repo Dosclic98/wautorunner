@@ -26,7 +26,7 @@ class AutorunnerManager():
     def __init__(self, **kwargs):
         self.logger = getLogger("AutorunnerManager")
         self.logger.info("Building scenario")
-        self.scenario: Scenario = kwargs.get("scenario", self.rebuildBaseScenario())
+        self.scenario: Scenario = kwargs.get("scenario", self.rebuildBaseScenario(True))
 
         self.modifiers: list[ModifierInterface] = kwargs.get("modifiers", 
                                                         [ExecTimeModifier(self.scenario, 40.0),
@@ -49,13 +49,15 @@ class AutorunnerManager():
                                                                                  ])
                                                         ])
 
-    def rebuildBaseScenario(self) -> Scenario:
+    def rebuildBaseScenario(self, isFirstRun: bool) -> Scenario:
         """
         Rebuilds the base scenario from the template.
         """
         scenario: Scenario = ScenarioBuilder.build(
             originPath=Path("wautorunner/scenarios/powerowl_example_template"),
-            targetPath=Path("wautorunner/scenarios/powerowl_example_final")
+            targetPath=Path("wautorunner/scenarios/powerowl_example_final"),
+            resultsPath=Path("wautorunner/scenarios/powerowl_example_results"),
+            clearResults=isFirstRun
         )
         self.logger.info("Scenario rebuilt")
         return scenario
@@ -68,21 +70,21 @@ class AutorunnerManager():
         discrTraces: pd.DataFrame 
         for i in range(0, numRuns):
             runStartTime = time.time()
-            self.scenario = self.rebuildBaseScenario()
+            self.scenario = self.rebuildBaseScenario(i == 0)
             modList: list[ModifierInterface] = self._generateNewModifiers(time=runTime)
-            newFullTraces, newDiscrTraces = self._execute(modList)
+            newFullTraces, newDiscrTraces = self._execute(modList, i)
             if i == 0: discrTraces = newDiscrTraces
             else:
                 # Append new traces
                 discrTraces = pd.concat([discrTraces, newDiscrTraces], ignore_index=True)
-            discrTraces.to_csv(self.scenario.scenarioPath.joinpath("discrTraces.csv"), index=False)
+            discrTraces.to_csv(self.scenario.resultsPath.joinpath("discrTraces.csv"), index=False)
             # Add a featur to newFullTraces to track the run number for each row
             newFullTraces["run"] = i
             if i == 0: fullTraces = newFullTraces
             else:
                 # Append new traces
                 fullTraces = pd.concat([fullTraces, newFullTraces], ignore_index=True)
-            fullTraces.to_csv(self.scenario.scenarioPath.joinpath("fullTraces.csv"), index=False)
+            fullTraces.to_csv(self.scenario.resultsPath.joinpath("fullTraces.csv"), index=False)
             runEndTime = time.time()
             self.logger.info(f"Finished execution {i+1}/{numRuns}")
             self.logger.info(f"Run took: {runEndTime-runStartTime} s")
@@ -152,7 +154,7 @@ class AutorunnerManager():
         newModifiers.append(AttackerStrategyModifier(self.scenario, strategyType=strategyType, strategy=strategy, closeDelay=closeDelay, startDelay=startDelay))
         return newModifiers
     
-    def _execute(self, modifiers: list[ModifierInterface]) -> pd.DataFrame:
+    def _execute(self, modifiers: list[ModifierInterface], runNumber: int) -> pd.DataFrame:
         """
         Execute the scenario with the given modifiers.
         """
@@ -194,10 +196,42 @@ class AutorunnerManager():
 
         analyzer: ExperimentAnalyzer = ExperimentAnalyzer(Path("wattson-artifacts"), self.scenario)
         fullTraces, discreteTraces = analyzer.discretizeTraces(dt=2, baseDelay=self.BASE_DELAY, totT=self.scenario.getExecTime())
+        self.retrievePcapFile(controller, self.scenario.getPcapPath(), runNumber)
         self.logger.info("Finished execution")
         self.logger.info("Cleaning artifacts")
         shutil.rmtree(controller.working_directory)
         return fullTraces, discreteTraces
+
+    def retrievePcapFile(self, controller: CoSimulationController, pcapFolderPath: Path, runNumber: int):
+        """
+        Retrieves the pcap file from the controller's working directory.
+        """
+        try:
+            if controller.working_directory is not None:
+                # Find the pcap file matching the file name "n375-service-[0-9]+-eth1.pcap"
+                pcapFilePath = self._findPcapFile(controller)
+                if pcapFilePath.exists():
+                    # Rename the file based on the run number
+                    newPcapFilePath = pcapFolderPath.joinpath(f"pcap-run-{runNumber}.pcap")
+                    shutil.copy(pcapFilePath, newPcapFilePath)
+                    self.logger.info(f"PCAP file copied to {pcapFolderPath}")
+                else:
+                    self.logger.warning("PCAP file does not exist in the controller's working directory.")
+            else:
+                self.logger.warning("Controller's working directory is None.")
+        except Exception as e:
+            self.logger.error(f"Error retrieving PCAP file: {e}")
+
+    def _findPcapFile(self, controller: CoSimulationController) -> Path:
+        """
+        Finds the pcap file in the controller's working directory (the service number can change).
+        """
+        if controller.working_directory is not None:
+            # Find the pcap file matching the file name "n375-service-[0-9]+-eth1.pcap"
+            for file in controller.working_directory.joinpath("n375").glob("n375-service-*-eth1.pcap"):
+                if file.is_file():
+                    return file
+            
 
     @staticmethod
     def stopController(controller: CoSimulationController):
