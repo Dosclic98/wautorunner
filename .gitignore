@@ -250,3 +250,4 @@ ubuntu/tmp/
 # User-defined
 scenarios/*_final
 scenarios/*_results
+analysis/*_results
