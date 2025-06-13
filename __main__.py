@@ -16,7 +16,7 @@ def main():
     loggerHandler.setFormatter(ColoredFormatter())
     basicConfig(level=INFO, handlers=[loggerHandler])
     # Fixing random seed for reproducibility
-    random.seed(101)
+    random.seed(98)
     # Create an instance of AutorunnerManager
     manager = AutorunnerManager()
     # Execute the scenario
