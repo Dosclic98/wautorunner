@@ -146,6 +146,9 @@ class ExperimentAnalyzer:
 
                 # Add a sequence number feature
                 fullTraceDict["SeqNumber"] = [i]
+
+                # Memorize the attack strategy type
+                fullTraceDict["AttackStrategy"] = [self.scenario.getAttackStrategyType()]
             if i == 0:
                 fullTraceDf = pd.DataFrame.from_dict(fullTraceDict, orient="columns")
             else:
@@ -249,6 +252,9 @@ class ExperimentAnalyzer:
             discreteDict["Generation"] = ["G_2"]
         else:
             discreteDict["Generation"] = ["G_3"]
+
+        # Specify the Attack Strategy type
+        discreteDict["AttackStrategy"] = [self.scenario.getAttackStrategyType()]
         
         return contTraces["fullTraceDf"].head(numSteps), pd.DataFrame.from_dict(discreteDict)
 

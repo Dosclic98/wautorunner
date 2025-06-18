@@ -204,7 +204,7 @@ class AutorunnerManager():
         self.retrievePcapFile(controller, self.scenario.getPcapPath(), runNumber)
         self.logger.info("Finished execution")
         self.logger.info("Cleaning artifacts")
-        #shutil.rmtree(controller.working_directory)
+        shutil.rmtree(controller.working_directory)
         return fullTraces, discreteTraces
 
     def retrievePcapFile(self, controller: CoSimulationController, pcapFolderPath: Path, runNumber: int):

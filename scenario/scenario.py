@@ -41,6 +41,7 @@ class Scenario:
         self.loadFactor: float = 1.0
         self._name = self.scenarioPath.name
         self._execTime = None
+        self._attackStrategyType = None
 
     def getName(self) -> str:
         return self._name 
@@ -164,3 +165,9 @@ class Scenario:
     
     def setExecTime(self, execTime: float):
         self._execTime = execTime
+
+    def getAttackStrategyType(self) -> str:
+        return self._attackStrategyType
+
+    def setAttackStrategyType(self, attackStrategyType: str):
+        self._attackStrategyType = attackStrategyType

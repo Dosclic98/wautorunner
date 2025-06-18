@@ -182,6 +182,7 @@ class AttackerStrategyModifier(ModifierInterface):
         """
         Modify the attack strategy in the scenario.
         """
+        self.scenario.setAttackStrategyType(self.strategyType.value)
         config: dict = self.scenario.getScriptControllerConfig()
         services: list = config.get("nodes", {}).get("ctrl", {}).get("services", [])
         service = None
