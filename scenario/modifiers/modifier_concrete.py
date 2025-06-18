@@ -144,8 +144,11 @@ class StrategyType(Enum):
     """
     Enum for the different types of policies.
     """
+    NOACTION = "no_action"
     EXPLICIT = "explicit"
     INTERMITTENT = "intermittent"
+    INTERMITTENT_CLOSED = "intermittent_closed"
+    INTERMITTENT_OPEN = "intermittent_open"
 
 class StrategyBuilder:
 
@@ -162,18 +165,18 @@ class StrategyBuilder:
 
 class AttackerStrategyModifier(ModifierInterface):
 
-    def __init__(self, scenario: Scenario, strategyType: StrategyType, strategy: list[dict] | list[int], startDelay: int = 5, closeDelay: int = 4) -> None:
+    def __init__(self, scenario: Scenario, strategyType: StrategyType = StrategyType.NOACTION, strategy: list[dict] | list[int] = [], startDelay: int = 5, actionDelay: int = 4) -> None:
         super().__init__(scenario)
 
         if strategyType == StrategyType.EXPLICIT and not isinstance(strategy, list):
             raise ValueError("Strategy must be a list of dictionaries")
-        if strategyType == StrategyType.INTERMITTENT and not isinstance(strategy, list):
+        if strategyType in [StrategyType.INTERMITTENT, StrategyType.INTERMITTENT_CLOSED, StrategyType.INTERMITTENT_OPEN] and not isinstance(strategy, list):
             raise ValueError("Strategy must be a list of integers")
         
         self.strategyType = strategyType
         self.strategy = strategy
         self.startDelay = startDelay
-        self.closeDelay = closeDelay
+        self.actionDelay = actionDelay
 
     def modify(self) -> None:
         """
@@ -198,7 +201,7 @@ class AttackerStrategyModifier(ModifierInterface):
         else:
             raise ValueError("Attacker strategy script not found in script controller config")
 
-        scriptConfig["close_delay"] = self.closeDelay
+        scriptConfig["action_delay"] = self.actionDelay
         scriptConfig["start_delay"] = self.startDelay
         scriptConfig["strategy"] = self.strategy
         scriptConfig["strategy_type"] = self.strategyType.value

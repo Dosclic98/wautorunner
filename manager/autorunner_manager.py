@@ -118,13 +118,18 @@ class AutorunnerManager():
                 switchConfig[i] = True
         newModifiers.append(SetSwitchesModifier(self.scenario, status=switchConfig))
 
-        # Randomly generate an attack strategy type
-        strategyType = random.choice([StrategyType.EXPLICIT, StrategyType.INTERMITTENT])
+        # Randomly generate an attack strategy type 
+        strategyType = random.choice([StrategyType.NOACTION, StrategyType.EXPLICIT, StrategyType.INTERMITTENT, StrategyType.INTERMITTENT_OPEN, StrategyType.INTERMITTENT_CLOSED])
         startDelay = 0
-        closeDelay = 0
+        actionDelay = 0
         # Randomly generate a number of switches to be attacked
         numAtkSwitches = random.randint(3, 6)
-        if strategyType == StrategyType.EXPLICIT:
+        if strategyType == StrategyType.NOACTION:
+            # No action strategy, no switches to be attacked
+            strategy: list[dict] = []
+            startDelay = 0
+            actionDelay = 0
+        elif strategyType == StrategyType.EXPLICIT:
             # Randomly generate a list of numAtkSwitches switches to be attacked with their respective times
             # and new status negating the previous status
             strategy: list[dict] = []
@@ -138,7 +143,7 @@ class AutorunnerManager():
                 isClosed = not switchConfig[switchId]
                 strategy.append(StrategyBuilder.build(switchId=switchId, time=atkTime, isClosed=isClosed)) 
             startDelay = 0
-        elif strategyType == StrategyType.INTERMITTENT:
+        elif strategyType in [StrategyType.INTERMITTENT, StrategyType.INTERMITTENT_CLOSED, StrategyType.INTERMITTENT_OPEN]:
             # Randomly generate a list of numAtkSwitches switches to be attacked
             strategy: list[int] = []
             swIds = []
@@ -149,9 +154,9 @@ class AutorunnerManager():
                 swIds.append(switchId) 
                 strategy.append(switchId)
             startDelay = round(random.uniform(5.0, time/2), 2)
-            closeDelay = round(random.uniform(2.0, 5.0), 2)
+            actionDelay = round(random.uniform(2.0, 5.0), 2)
         
-        newModifiers.append(AttackerStrategyModifier(self.scenario, strategyType=strategyType, strategy=strategy, closeDelay=closeDelay, startDelay=startDelay))
+        newModifiers.append(AttackerStrategyModifier(self.scenario, strategyType=strategyType, strategy=strategy, actionDelay=actionDelay, startDelay=startDelay))
         return newModifiers
     
     def _execute(self, modifiers: list[ModifierInterface], runNumber: int) -> pd.DataFrame:
@@ -199,7 +204,7 @@ class AutorunnerManager():
         self.retrievePcapFile(controller, self.scenario.getPcapPath(), runNumber)
         self.logger.info("Finished execution")
         self.logger.info("Cleaning artifacts")
-        shutil.rmtree(controller.working_directory)
+        #shutil.rmtree(controller.working_directory)
         return fullTraces, discreteTraces
 
     def retrievePcapFile(self, controller: CoSimulationController, pcapFolderPath: Path, runNumber: int):
