@@ -251,3 +251,4 @@ ubuntu/tmp/
 scenarios/*_final
 scenarios/*_results
 analysis/*_results
+analysis/old
