@@ -191,7 +191,6 @@ class AutorunnerManager():
                 plt.savefig(self.scenario.scenarioPath.joinpath("fullPPGraph.png"))
                 simple_plot(ppNet, plot_gens=True, plot_line_switches=True, plot_loads=True, plot_sgens=True)
                 plt.savefig(self.scenario.scenarioPath.joinpath("full-plot.png"))
-                simple_plotly(ppNet, filename=self.scenario.scenarioPath.joinpath("full-plot.html").absolute().__str__(), auto_open=False)
                 
                 controller.join(self.scenario.getExecTime() + self.BASE_DELAY)    
             except Exception as e:
@@ -201,7 +200,8 @@ class AutorunnerManager():
 
         analyzer: ExperimentAnalyzer = ExperimentAnalyzer(Path("wattson-artifacts"), self.scenario)
         fullTraces, discreteTraces = analyzer.discretizeTraces(dt=2, baseDelay=self.BASE_DELAY, totT=self.scenario.getExecTime())
-        self.retrievePcapFile(controller, self.scenario.getPcapPath(), runNumber)
+        if not AutorunnerManager.DEBUG_ANALYZER:
+            self.retrievePcapFile(controller, self.scenario.getPcapPath(), runNumber)
         self.logger.info("Finished execution")
         self.logger.info("Cleaning artifacts")
         shutil.rmtree(controller.working_directory)

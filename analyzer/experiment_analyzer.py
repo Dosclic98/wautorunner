@@ -22,6 +22,8 @@ class ExperimentAnalyzer:
         "switch": ["closed"]
     }
 
+    bussesFeeder2 = [12, 13, 14]
+
     def __init__(self, working_dir: Path, scenario: Scenario):
         self.logger = logging.getLogger("ExperimentAnalyzer")
         self.working_dir = working_dir
@@ -44,7 +46,8 @@ class ExperimentAnalyzer:
         endTime = self.measures["timestamp"].max()
         timeBins = pd.date_range(start=startTime, end=endTime, freq=f"{dt}S")
 
-        percAbnormalBusses = []
+        percAbnormalBussesF1 = []
+        percAbnormalBussesF2 = []
         percOverloadedLines = []
         percNodesInCycles = []
         switchStates = []
@@ -63,30 +66,32 @@ class ExperimentAnalyzer:
                 busVoltagesInTimeBin = measuresInTimeBin[(measuresInTimeBin["element-type"] == "bus") & (measuresInTimeBin["measure-name"] == "voltage")].sort_values(by="element-id")
                 lineLoadingsInTimeBin = measuresInTimeBin[(measuresInTimeBin["element-type"] == "line") & (measuresInTimeBin["measure-name"] == "loading")]
                 # Just take the last measure for each bus and line in the time bin
-
-                busVoltagesInTimeBin = busVoltagesInTimeBin.groupby(["element-id", "measure-name"]).agg({"measure": "last"})
-                lineLoadingsInTimeBin = lineLoadingsInTimeBin.groupby(["element-id", "measure-name"]).agg({"measure": "last"})
-                numAbnormalBusses = len(busVoltagesInTimeBin[(busVoltagesInTimeBin["measure"] < 0.95) | (busVoltagesInTimeBin["measure"] > 1.05)])
+                busVoltagesInTimeBin = busVoltagesInTimeBin.groupby(["element-id", "measure-name"], as_index=False).agg({"measure": "last"})
+                lineLoadingsInTimeBin = lineLoadingsInTimeBin.groupby(["element-id", "measure-name"], as_index=False).agg({"measure": "last"})
+                numAbnormalBussesF1 = len(busVoltagesInTimeBin[((busVoltagesInTimeBin["measure"] < 0.95) | (busVoltagesInTimeBin["measure"] > 1.05)) & (~busVoltagesInTimeBin["element-id"].isin(ExperimentAnalyzer.bussesFeeder2))])
+                numAbnormalBussesF2 = len(busVoltagesInTimeBin[((busVoltagesInTimeBin["measure"] < 0.95) | (busVoltagesInTimeBin["measure"] > 1.05)) & (busVoltagesInTimeBin["element-id"].isin(ExperimentAnalyzer.bussesFeeder2))])
                 numOverloadedLines = len(lineLoadingsInTimeBin[lineLoadingsInTimeBin["measure"] > 100])
                 numBusses = len(busVoltagesInTimeBin)
                 numLines = len(lineLoadingsInTimeBin)
-                percAbnormalBusses.append(numAbnormalBusses / numBusses if numBusses > 0 else 0)
+                percAbnormalBussesF1.append(numAbnormalBussesF1 / (numBusses-len(ExperimentAnalyzer.bussesFeeder2)) if (numBusses-len(ExperimentAnalyzer.bussesFeeder2)) > 0 else 0)
+                percAbnormalBussesF2.append(numAbnormalBussesF2 / len(ExperimentAnalyzer.bussesFeeder2) if len(ExperimentAnalyzer.bussesFeeder2) > 0 else 0)
                 percOverloadedLines.append(numOverloadedLines / numLines if numLines > 0 else 0)
 
                 busVoltages: dict = {}
                 lineLoadings: dict = {}
                 for index, row in busVoltagesInTimeBin.iterrows():
-                    busVoltages[index] = row["measure"]
+                    busVoltages[row["element-id"]] = row["measure"]
                     # Insert a new element with key BusVoltage_i and value voltage_of_bus_i in the dictionary
-                    fullTraceDict[f"BusVoltage_{index[0]}"] = [row["measure"]]
+                    fullTraceDict[f"BusVoltage_{row['element-id']}"] = [row["measure"]]
                 for index, row in lineLoadingsInTimeBin.iterrows():
-                    lineLoadings[index] = row["measure"]
+                    lineLoadings[row["element-id"]] = row["measure"]
                     # Insert a new element with key LineLoading_i and value loading_of_line_i in the dictionary
-                    fullTraceDict[f"LineLoading_{index[0]}"] = [row["measure"]]
+                    fullTraceDict[f"LineLoading_{row['element-id']}"] = [row["measure"]]
 
                 self.logger.debug(f"Bus voltages: {busVoltages}")
                 self.logger.debug(f"Line loadings: {lineLoadings}")
-                self.logger.debug(f"Number of abnormal busses: {numAbnormalBusses} / {numBusses}")
+                self.logger.debug(f"Number of abnormal busses Feeder 1: {numAbnormalBussesF1} / {(numBusses-len(ExperimentAnalyzer.bussesFeeder2))}")
+                self.logger.debug(f"Number of abnormal busses Feeder 2: {numAbnormalBussesF2} / {len(ExperimentAnalyzer.bussesFeeder2)}")
                 self.logger.debug(f"Number of overloaded lines: {numOverloadedLines} / {numLines}")
             else:
                 self.logger.debug("No measures in this time bin.")
@@ -157,7 +162,8 @@ class ExperimentAnalyzer:
 
 
         return {
-            "percAbnormalBusses": percAbnormalBusses,
+            "percAbnormalBussesF1": percAbnormalBussesF1,
+            "percAbnormalBussesF2": percAbnormalBussesF2,
             "percOverloadedLines": percOverloadedLines,
             "percNodesInCycles": percNodesInCycles,
             "switchStates": switchStates,
@@ -166,34 +172,36 @@ class ExperimentAnalyzer:
     
     def discretizeTraces(self, dt: int, baseDelay: float, totT: float) -> dict:
         contTraces = self.genTraces(dt, baseDelay=baseDelay)
-        self.logger.debug(f"Len abnormal busses: {len(contTraces['percAbnormalBusses'])}")
+        self.logger.debug(f"Len abnormal busses Feeder 1: {len(contTraces['percAbnormalBussesF1'])}")
+        self.logger.debug(f"Len abnormal busses Feeder 2: {len(contTraces['percAbnormalBussesF2'])}")
         self.logger.debug(f"Len overloaded lines: {len(contTraces['percOverloadedLines'])}")
         self.logger.debug(f"Len nodes in cycles: {len(contTraces['percNodesInCycles'])}")
         self.logger.debug(f"Len switch states: {len(contTraces['switchStates'])}")
 
         numSteps: int = round(totT / dt)
 
-        if (len(contTraces["percAbnormalBusses"]) < numSteps or len(contTraces["percOverloadedLines"]) < numSteps or 
+        if (len(contTraces["percAbnormalBussesF1"]) < numSteps or len(contTraces["percAbnormalBussesF2"]) < numSteps or len(contTraces["percOverloadedLines"]) < numSteps or 
                 len(contTraces["percNodesInCycles"]) < numSteps or len(contTraces["switchStates"]) < numSteps):
             raise ValueError("Not enough data points to discretize traces.")
 
         discreteDict = {}
-        for i in range(numSteps):
-            value = ""
-            if contTraces["percAbnormalBusses"][i] < 0.25:
-                value = "BV_0"
-            elif contTraces["percAbnormalBusses"][i] < 0.5:
-                value = "BV_1"
-            elif contTraces["percAbnormalBusses"][i] < 0.75:
-                value = "BV_2"
-            else:
-                value = "BV_3"
+        for j in range(1,3):
+            for i in range(numSteps):
+                value = ""
+                if contTraces[f"percAbnormalBussesF{j}"][i] < 0.25:
+                    value = "BV_0"
+                elif contTraces[f"percAbnormalBussesF{j}"][i] < 0.5:
+                    value = "BV_1"
+                elif contTraces[f"percAbnormalBussesF{j}"][i] < 0.75:
+                    value = "BV_2"
+                else:
+                    value = "BV_3"
 
 
-            if i == 0:
-                discreteDict["Bus_Voltages"] = [value]
-            else:
-                discreteDict[f"Bus_Voltages_{i}"] = [value]
+                if i == 0:
+                    discreteDict[f"Bus_Voltages_Feeder_{j}"] = [value]
+                else:
+                    discreteDict[f"Bus_Voltages_Feeder_{j}_{i}"] = [value]
 
         for i in range(numSteps):
             value = ""
