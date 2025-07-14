@@ -250,7 +250,44 @@ class ExperimentAnalyzer:
                     discreteDict[f"Switch_{index}"] = ["C"] if state else ["O"]
                 else:
                     discreteDict[f"Switch_{index}_{i}"] = ["C"] if state else ["O"]
+
+        # Establish the first seq. number when the switch state has been modified by the attacker
+        atkStartSeqNum = 0
+        for i in range(numSteps):
+            if i == 0:
+                originalSwitchState = contTraces["switchStates"][i]
+            else:
+                currentSwitchState = contTraces["switchStates"][i]
+                if currentSwitchState != originalSwitchState:
+                    atkStartSeqNum = i
+                    break
         
+        for i in range(numSteps):
+            from wautorunner.scenario.modifiers.modifier_concrete import StrategyType
+            if i == 0:
+                discreteDict["ManipulationOfControlExplicit"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.EXPLICIT.value else "N"]
+            else:
+                discreteDict[f"ManipulationOfControlExplicit_{i}"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.EXPLICIT.value else "N"]
+
+        for i in range(numSteps):
+            if i == 0:
+                discreteDict["ManipulationOfControlAlternate"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT.value else "N"]
+            else:
+                discreteDict[f"ManipulationOfControlAlternate_{i}"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT.value else "N"]
+
+        for i in range(numSteps):
+            if i == 0:
+                discreteDict["ManipulationOfControlOFFOnly"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_CLOSED.value else "N"]
+            else:
+                discreteDict[f"ManipulationOfControlOFFOnly_{i}"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_CLOSED.value else "N"]
+
+        for i in range(numSteps):
+            if i == 0:
+                discreteDict["ManipulationOfControlONOnly"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_OPEN.value else "N"]
+            else:
+                discreteDict[f"ManipulationOfControlONOnly_{i}"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_OPEN.value else "N"]
+
+
         # Add load and generation profiles traces
         if self.scenario.loadFactor < 1:
             discreteDict["Load"] = "L_0"
@@ -269,9 +306,6 @@ class ExperimentAnalyzer:
             discreteDict["Generation"] = ["G_2"]
         else:
             discreteDict["Generation"] = ["G_3"]
-
-        # Specify the Attack Strategy type
-        discreteDict["AttackStrategy"] = [self.scenario.getAttackStrategyType()]
         
         return contTraces["fullTraceDf"].head(numSteps), pd.DataFrame.from_dict(discreteDict)
 
