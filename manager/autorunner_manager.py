@@ -123,7 +123,8 @@ class AutorunnerManager():
         startDelay = 0
         actionDelay = 0
         # Randomly generate a number of switches to be attacked
-        numAtkSwitches = random.randint(3, 6)
+        maxSwitchIndex = 7 # Change with 5 to exclude switch 6 and 7
+        numAtkSwitches = random.randint(3, maxSwitchIndex+1)
         if strategyType == StrategyType.NOACTION:
             # No action strategy, no switches to be attacked
             strategy: list[dict] = []
@@ -135,9 +136,9 @@ class AutorunnerManager():
             strategy: list[dict] = []
             swIds = []
             for i in range(0, numAtkSwitches):
-                switchId = random.randint(0, 5)
+                switchId = random.randint(0, maxSwitchIndex)
                 while switchId in swIds:
-                    switchId = random.randint(0, 5)
+                    switchId = random.randint(0, maxSwitchIndex)
                 swIds.append(switchId) 
                 atkTime = round(random.uniform(5.0, time-5.0), 2)
                 isClosed = not switchConfig[switchId]
@@ -148,9 +149,9 @@ class AutorunnerManager():
             strategy: list[int] = []
             swIds = []
             for i in range(0, numAtkSwitches):
-                switchId = random.randint(0, 5)
+                switchId = random.randint(0, maxSwitchIndex)
                 while switchId in swIds:
-                    switchId = random.randint(0, 5)
+                    switchId = random.randint(0, maxSwitchIndex)
                 swIds.append(switchId) 
                 strategy.append(switchId)
             startDelay = round(random.uniform(5.0, time/2), 2)
