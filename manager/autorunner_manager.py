@@ -3,7 +3,7 @@ from wautorunner.analyzer.experiment_analyzer import ExperimentAnalyzer
 from wautorunner.scenario.modifiers.modifier_interface import ModifierInterface
 from wautorunner.scenario.modifiers.modifier_concrete import MultiplyLoadsModifier, MultiplyGenerationModifier, SetAllSwitchesModifier
 from wautorunner.scenario.modifiers.modifier_concrete import SetSwitchesModifier, AttackerStrategyModifier, StrategyType, StrategyBuilder
-from wautorunner.scenario.modifiers.modifier_concrete import MultiplyMaxCurrentModifier, SetMinMaxVoltageModifier
+from wautorunner.scenario.modifiers.modifier_concrete import MultiplyMaxCurrentModifier, SetMinMaxVoltageModifier, SetSimulationIntervalModifier
 from wautorunner.scenario.modifiers.modifier_concrete import ExecTimeModifier
 from wattson.cosimulation.control.co_simulation_controller import CoSimulationController
 from wattson.cosimulation.simulators.network.emulators.wattson_network_emulator import WattsonNetworkEmulator
@@ -62,7 +62,7 @@ class AutorunnerManager():
         self.logger.info("Scenario rebuilt")
         return scenario
 
-    def autoBatchExecute(self, runTime: float, numRuns: int):
+    def autoBatchExecute(self, runTime: float, numRuns: int, simInterval: int):
         """
         Generates multiple scenarios with different modifiers and executes them.
         """
@@ -71,7 +71,7 @@ class AutorunnerManager():
         for i in range(0, numRuns):
             runStartTime = time.time()
             self.scenario = self.rebuildBaseScenario(i == 0)
-            modList: list[ModifierInterface] = self._generateNewModifiers(time=runTime)
+            modList: list[ModifierInterface] = self._generateNewModifiers(time=runTime, simInterval=simInterval)
             newFullTraces, newDiscrTraces = self._execute(modList, i)
             if i == 0: discrTraces = newDiscrTraces
             else:
@@ -92,11 +92,12 @@ class AutorunnerManager():
                 self.logger.info(f"Starting next run...")
                 time.sleep(1)  # Sleep for 1 second between runs
     
-    def _generateNewModifiers(self, time: float) -> list[ModifierInterface]:
+    def _generateNewModifiers(self, time: float, simInterval: int) -> list[ModifierInterface]:
         """
         Generates multiple lists of modifiers
         """
         newModifiers: list[ModifierInterface] = []
+        newModifiers.append(SetSimulationIntervalModifier(self.scenario, simInterval))
         # Generates an ExecTimeModifier based on the input parameter
         newModifiers.append(ExecTimeModifier(self.scenario, time))
         newModifiers.append(SetMinMaxVoltageModifier(self.scenario, minVoltage=0.95, maxVoltage=1.05))
@@ -200,7 +201,8 @@ class AutorunnerManager():
                 AutorunnerManager.stopController(controller)
 
         analyzer: ExperimentAnalyzer = ExperimentAnalyzer(Path("wattson-artifacts"), self.scenario)
-        fullTraces, discreteTraces = analyzer.discretizeTraces(dt=2, baseDelay=self.BASE_DELAY, totT=self.scenario.getExecTime())
+        # dt was originally set to 2 seconds (it must be set accordingly to the server tick rate)
+        fullTraces, discreteTraces = analyzer.discretizeTraces(dt=self.scenario.getSimulationInterval(), baseDelay=self.BASE_DELAY, totT=self.scenario.getExecTime())
         if not AutorunnerManager.DEBUG_ANALYZER:
             self.retrievePcapFile(controller, self.scenario.getPcapPath(), runNumber)
         self.logger.info("Finished execution")

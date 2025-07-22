@@ -39,12 +39,24 @@ class Scenario:
         self.powerGridModel: dict = self.getPowerGridModel()
         self.generationFactor: float = 1.0
         self.loadFactor: float = 1.0
+        self.simInterval: int = 2  # Default simulation interval in seconds
         self._name = self.scenarioPath.name
         self._execTime = None
         self._attackStrategyType = None
 
     def getName(self) -> str:
         return self._name 
+    
+    def getPowerProfilesConfig(self) -> dict:
+        # Logic to get the power profiles config file
+        with open(self.scenarioPath.joinpath("extensions").joinpath("power-profiles.yml"), 'r') as file:
+            return yaml.load(file, Loader=yaml.Loader)
+        
+    def savePowerProfilesConfig(self, config: dict):
+        # Logic to set the power profiles config file
+        with open(self.scenarioPath.joinpath("extensions").joinpath("power-profiles.yml"), 'w') as file:
+            file.truncate(0)
+            yaml.dump(config, file, default_flow_style=False, sort_keys=False)
 
     def getScriptControllerConfig(self) -> dict:
         # Logic to get the script controller config file
@@ -165,6 +177,9 @@ class Scenario:
     
     def setExecTime(self, execTime: float):
         self._execTime = execTime
+
+    def getSimulationInterval(self) -> int:
+        return self.simInterval
 
     def getAttackStrategyType(self) -> str:
         return self._attackStrategyType

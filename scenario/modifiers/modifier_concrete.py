@@ -2,6 +2,26 @@ from wautorunner.scenario.modifiers.modifier_interface import ModifierInterface
 from wautorunner.scenario.scenario import Scenario
 from enum import Enum
 
+
+class SetSimulationIntervalModifier(ModifierInterface):
+    """
+    Set the simulation interval for the power grid simulator.
+    """
+
+    def __init__(self, scenario: Scenario, interval: int) -> None:
+        super().__init__(scenario)
+        self.interval = interval
+
+    def modify(self) -> None:
+        """
+        Set the simulation interval in the scenario.
+        """
+        ppConfig: dict = self.scenario.getPowerProfilesConfig()
+        ppConfig["config"]["power-grid"]["profile-loader"]["interval"] = self.interval
+        self.scenario.simInterval = self.interval
+        self.scenario.savePowerProfilesConfig(ppConfig)
+
+
 class MultiplyLoadsModifier(ModifierInterface):
     """
     Multiply all loads by a given factor.

@@ -20,7 +20,8 @@ def main():
     # Create an instance of AutorunnerManager
     manager = AutorunnerManager()
     # Execute the scenario
-    manager.autoBatchExecute(runTime=40.0, numRuns=500)
+    # Originally it was set to run for 40 seconds with dt of 2s
+    manager.autoBatchExecute(runTime=80.0, numRuns=500, simInterval=1)
 
 
 if __name__ == '__main__':
