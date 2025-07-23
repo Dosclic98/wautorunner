@@ -17,7 +17,7 @@ class SetSimulationIntervalModifier(ModifierInterface):
         Set the simulation interval in the scenario.
         """
         ppConfig: dict = self.scenario.getPowerProfilesConfig()
-        ppConfig["config"]["power-grid"]["profile-loader"]["interval"] = self.interval
+        ppConfig["config"]["power-grid"]["profile-loader"]["interval"] = self.interval / 1.5
         self.scenario.simInterval = self.interval
         self.scenario.savePowerProfilesConfig(ppConfig)
 
