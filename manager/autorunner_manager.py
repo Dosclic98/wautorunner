@@ -165,40 +165,43 @@ class AutorunnerManager():
         """
         Execute the scenario with the given modifiers.
         """
-        self.logger.info("Applying modifiers")
-        for modifier in modifiers:
-            modifier.modify()
-        
-        if not AutorunnerManager.DEBUG_ANALYZER:
-            config = {}
-            controller: CoSimulationController = CoSimulationController(self.scenario.getScenarioPath(),
-                                                network_emulator=WattsonNetworkEmulator(),
-                                                **config)
-            controller.network_emulator.enable_management_network()
-            controller.load_scenario()
-            controller.start()
-            self.logger.info("Wattson started!")
+        run_success = False
+        while not run_success:
+            self.logger.info(f"Executing run {runNumber+1}")
+            self.logger.info("Applying modifiers")
+            for modifier in modifiers:
+                modifier.modify()
+            
+            if not AutorunnerManager.DEBUG_ANALYZER:
+                config = {}
+                controller: CoSimulationController = CoSimulationController(self.scenario.getScenarioPath(),
+                                                    network_emulator=WattsonNetworkEmulator(),
+                                                    **config)
+                controller.network_emulator.enable_management_network()
+                controller.load_scenario()
+                controller.start()
+                self.logger.info("Wattson started!")
 
-            def teardown(_sig, _frame):
-                AutorunnerManager.stopController(controller)
+                def teardown(_sig, _frame):
+                    AutorunnerManager.stopController(controller)
 
-            signal.signal(signalnum=signal.SIGTERM, handler=teardown)
-            signal.signal(signalnum=signal.SIGINT, handler=teardown)
+                signal.signal(signalnum=signal.SIGTERM, handler=teardown)
+                signal.signal(signalnum=signal.SIGINT, handler=teardown)
 
-            try:
-                # Let it run for maximum period_s seconds
-                ppNet = controller._physical_simulator._grid_model._pp_net
-                nxGraph: nx.Graph = tp.create_nxgraph(controller._physical_simulator._grid_model._pp_net, respect_switches=True)
-                nx.draw(nxGraph, with_labels=True)
-                plt.savefig(self.scenario.scenarioPath.joinpath("fullPPGraph.png"))
-                simple_plot(ppNet, plot_gens=True, plot_line_switches=True, plot_loads=True, plot_sgens=True)
-                plt.savefig(self.scenario.scenarioPath.joinpath("full-plot.png"))
-                
-                controller.join(self.scenario.getExecTime() + self.BASE_DELAY)    
-            except Exception as e:
-                print(traceback.format_exc())
-            finally:
-                AutorunnerManager.stopController(controller)
+                try:                
+                    controller.join(self.scenario.getExecTime() + self.BASE_DELAY)   
+                    AutorunnerManager.stopController(controller)
+                    run_success = True 
+                except Exception as e:
+                    controller.logger.warning(f"Error during shutdown occurred - trying cleanup")
+                    controller.logger.error(f"{e=}")
+                    print(traceback.format_exc())
+                    run_success = False
+                    AutorunnerManager.cleanup()
+                    
+            else:
+                self.logger.info("Skipping execution due to DEBUG_ANALYZER flag")
+                run_success = True
 
         analyzer: ExperimentAnalyzer = ExperimentAnalyzer(Path("wattson-artifacts"), self.scenario)
         # dt was originally set to 2 seconds (it must be set accordingly to the server tick rate)
@@ -243,16 +246,17 @@ class AutorunnerManager():
 
     @staticmethod
     def stopController(controller: CoSimulationController):
-        try:
-            controller.logger.info("Stopping Wattson")
-            controller.stop()
-        except Exception as e:
-            controller.logger.warning(f"Error during teardown occurred - trying cleanup")
-            controller.logger.error(f"{e=}")
-            controller.logger.error(traceback.print_exception(e))
-            
-            from wattson.util.clean.__main__ import main as wattson_clean
-            wattson_clean()      
+        controller.logger.info("Stopping Wattson")
+        controller.stop()            
+        AutorunnerManager.cleanup()  
+
+    @staticmethod
+    def cleanup():
+        """
+        Static method to clean up resources.
+        """
+        from wattson.util.clean.__main__ import main as wattson_clean
+        wattson_clean()  
 
     def stop(self):
         """
