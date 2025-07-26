@@ -265,28 +265,19 @@ class ExperimentAnalyzer:
         for i in range(numSteps):
             from wautorunner.scenario.modifiers.modifier_concrete import StrategyType
             if i == 0:
-                discreteDict["ManipulationOfControlExplicit"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.EXPLICIT.value else "N"]
+                colName = "ManipulationOfControl"
             else:
-                discreteDict[f"ManipulationOfControlExplicit_{i}"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.EXPLICIT.value else "N"]
-
-        for i in range(numSteps):
-            if i == 0:
-                discreteDict["ManipulationOfControlAlternate"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT.value else "N"]
-            else:
-                discreteDict[f"ManipulationOfControlAlternate_{i}"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT.value else "N"]
-
-        for i in range(numSteps):
-            if i == 0:
-                discreteDict["ManipulationOfControlOFFOnly"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_CLOSED.value else "N"]
-            else:
-                discreteDict[f"ManipulationOfControlOFFOnly_{i}"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_CLOSED.value else "N"]
-
-        for i in range(numSteps):
-            if i == 0:
-                discreteDict["ManipulationOfControlONOnly"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_OPEN.value else "N"]
-            else:
-                discreteDict[f"ManipulationOfControlONOnly_{i}"] = ["S" if i >= atkStartSeqNum and self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_OPEN.value else "N"]
-
+                colName = f"ManipulationOfControl_{i}"
+            if self.scenario.getAttackStrategyType() == StrategyType.EXPLICIT.value:
+                discreteDict[colName] = ["Explicit" if i >= atkStartSeqNum else "N"]
+            elif self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT.value:
+                discreteDict[colName] = ["Alternate" if i >= atkStartSeqNum else "N"]
+            elif self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_OPEN.value:
+                discreteDict[colName] = ["OpenOnly" if i >= atkStartSeqNum else "N"]
+            elif self.scenario.getAttackStrategyType() == StrategyType.INTERMITTENT_CLOSED.value:
+                discreteDict[colName] = ["CloseOnly" if i >= atkStartSeqNum else "N"]
+            elif self.scenario.getAttackStrategyType() == StrategyType.NOACTION.value:
+                discreteDict[colName] = ["N"]
 
         # Add load and generation profiles traces
         if self.scenario.loadFactor < 1:

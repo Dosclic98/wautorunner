@@ -21,7 +21,7 @@ def main():
     manager = AutorunnerManager()
     # Execute the scenario
     # Originally it was set to run for 40 seconds with dt of 2s
-    manager.autoBatchExecute(runTime=80.0, numRuns=500, simInterval=1)
+    manager.autoBatchExecute(runTime=80.0, numRuns=1000, simInterval=1)
 
 
 if __name__ == '__main__':
